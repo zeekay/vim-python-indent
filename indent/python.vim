@@ -1,23 +1,42 @@
-if exists("g:python_indent_loaded")
-    finish
-endif
-let g:python_indent_loaded = 1
+" Vim indent file
+" Language:		Python
+" Maintainer:		Bram Moolenaar <Bram@vim.org>
+" Original Author:	David Bustos <bustos@caltech.edu>
+" Last Change:		2013 Jul 9
 
+" Only load this indent file when no other was loaded.
+if exists("b:did_indent")
+  finish
+endif
+let b:did_indent = 1
+
+" Some preliminary settings
+setlocal nolisp		" Make sure lisp indenting doesn't supersede us
+setlocal autoindent	" indentexpr isn't much help otherwise
+
+setlocal indentexpr=GetPythonIndent(v:lnum)
+setlocal indentkeys+=<:>,=elif,=except
+
+" Only define the function once.
+if exists("*GetPythonIndent")
+  finish
+endif
 let s:keepcpo= &cpo
 set cpo&vim
 
-" maximum number of lines to look backwards for ()
-let s:maxoff = 50
+" Come here when loading the script the first time.
 
-function! python_indent#get_indent(lnum)
+let s:maxoff = 50	" maximum number of lines to look backwards for ()
+
+function GetPythonIndent(lnum)
+
   " If this line is explicitly joined: If the previous line was also joined,
-  " line it up with that one, otherwise one 'shiftwidth'.
+  " line it up with that one, otherwise add two 'shiftwidth'
   if getline(a:lnum - 1) =~ '\\$'
-    " if a:lnum > 1 && getline(a:lnum - 2) =~ '\\$'
-    "   return indent(a:lnum - 1)
-    " endif
-    " return indent(a:lnum - 1) + (exists("g:pyindent_continue") ? eval(g:pyindent_continue) : shiftwidth())
-    return indent(a:lnum - 1)
+    if a:lnum > 1 && getline(a:lnum - 2) =~ '\\$'
+      return indent(a:lnum - 1)
+    endif
+    return indent(a:lnum - 1) + (exists("g:pyindent_continue") ? eval(g:pyindent_continue) : (shiftwidth() * 2))
   endif
 
   " If the start of the line is in a string don't change the indent.
@@ -70,10 +89,9 @@ function! python_indent#get_indent(lnum)
 	  \ . " synIDattr(synID(line('.'), col('.'), 1), 'name')"
 	  \ . " =~ '\\(Comment\\|Todo\\|String\\)$'")
       if pp > 0
-	    return indent(plnum) + (exists("g:pyindent_nested_paren") ? eval(g:pyindent_nested_paren) : shiftwidth())
+	return indent(plnum) + (exists("g:pyindent_nested_paren") ? eval(g:pyindent_nested_paren) : shiftwidth())
       endif
-      " Modified from built-in which does shiftwidth()*2
-      return indent(plnum) + (exists("g:pyindent_open_paren") ? eval(g:pyindent_open_paren) : shiftwidth())
+      return indent(plnum) + (exists("g:pyindent_open_paren") ? eval(g:pyindent_open_paren) : (shiftwidth() * 2))
     endif
     if plnumstart == p
       return indent(plnum)
@@ -177,43 +195,4 @@ endfunction
 let &cpo = s:keepcpo
 unlet s:keepcpo
 
-function! s:vim_python#run_buffer(...)
-    let fn = expand('%:p')
-    if fn == ''
-        echoerr 'Save buffer to file first'
-        return
-    endif
-
-    " setup python command so virtualenv gets activated if necessary
-    if exists('g:virtualenv_name')
-        let cmd = 'source '.g:virtualenv_directory.'/'.g:virtualenv_name.'/bin/activate && python '
-    else
-        let cmd = 'python '
-    endif
-
-    " handle arguments to python script
-    if a:0
-        let args = ' '.join(a:000)
-    else
-        let args = ''
-    endif
-
-    " write file out
-    exe 'w'
-
-    " create new preview window and read results into it
-    pclose! | botright 10 new
-    try
-        silent exe '0r! '.cmd.' '.fn.' '.args
-    catch /.*/
-        close
-        echoerr 'Command failed'
-    endtry
-    redraw
-    normal gg
-    setlocal buftype=nofile bufhidden=delete noswapfile nowrap previewwindow
-    wincmd p
-endfunction
-
-let &cpo = s:keepcpo
-unlet s:keepcpo
+" vim:sw=2
